@@ -1,5 +1,3 @@
-# You like death rolling?
-
 # Requirements
 - .net 8 runtime
 
