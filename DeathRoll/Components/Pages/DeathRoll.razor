@@ -1,35 +1,67 @@
-﻿@page "/counter"
+﻿@page "/"
 @rendermode InteractiveServer
+
+<Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.TopRight" />
 
 <PageTitle>Death Roll</PageTitle>
 
 <h1>Death Roll</h1>
 
+@if (_players.Count < 10)
+{
+    <button class="btn btn-secondary" @onclick="AddPlayer">Add player</button>
+}
+
+<br/>
+<br/>
+
 @foreach(var (_, index) in _players.Select((player, index) => (player, index)))
 {
     <input @bind="_players[index]" class="form-control player-name" placeholder="Player @(index+1) name"/>
-    <Button @onclick="() => RemovePlayer(index)" class="btn btn-danger">
-        <Icon Name="IconName.Trash"/>
-    </Button>
+    @if (_players.Count > 2)
+    {
+        <Button @onclick="() => RemovePlayer(index)" class="btn btn-danger">
+            <Icon Name="IconName.Trash"/>
+        </Button>
+    }
     <br/>
 }
-<button class="btn btn-secondary" @onclick="AddPlayer">Add player</button>
 
-<p role="status">Current player @_players[_currentPlayer]</p>
-<p role="status">Current roll: @_currentRoll</p>
-@if (_winner != null)
+<br/>
+<br/>
+
+@if (_players.Count >= 2 && AllPlayersHaveNames())
 {
-    <p role="status">Winner: @_winner</p>
+    <p role="status">Current player: @_players[_currentPlayer]</p>
+    <p role="status">@_players[_previousPlayer] rolled: @_currentRoll</p>
 }
 
-<button class="btn btn-primary" @onclick="Roll">Roll @_limits.min - @_limits.max</button>
+@if (_winner == null)
+{
+    <button class="btn btn-primary" @onclick="Roll">Roll @_limits.min - @_limits.max</button>
+}
+else
+{
+    <button class="btn btn-primary" @onclick="Reset">Reset</button>
+}
+
+<br/>
+<br/>
+
+@if (_winner != null)
+{
+    <h1>Winner: @_winner</h1>
+}
 
 @code {
     private (int min, int max) _limits = (1, 100);
-    private List<string?> _players = [];
+    private readonly List<string?> _players = [];
     private int _currentPlayer;
-    private int _currentRoll;
+    private int _previousPlayer;
+    private int? _currentRoll;
     private string? _winner;
+
+    [Inject] protected ToastService ToastService { get; set; }
 
     protected override void OnInitialized()
     {
@@ -39,20 +71,35 @@
         
     private void Roll()
     {
+        if (!VerifyPlayerNames())
+        {
+            return;
+        }
+        
         _currentRoll = new Random().Next(_limits.min, _limits.max);
+        _previousPlayer = _currentPlayer;
 
         if (_currentRoll == 1)
         {
-            _players.RemoveAt(_currentPlayer);
+            if (_players.Count > 2)
+            {
+                _players.RemoveAt(_currentPlayer);
+                _limits = (1, 100);
+            }
+            else
+            {
+                _winner = _players[(_currentPlayer + 1) % _players.Count];
+            }
         }
-        
-        if (_players.Count == 1)
+        else
         {
-            _winner = _players[0];
+            _limits.max = _currentRoll ?? 0;
         }
-        
-        _currentPlayer = (_currentPlayer + 1) % _players.Count;
-        _limits.max = _currentRoll;
+
+        if (_winner == null)
+        {
+            _currentPlayer = (_currentPlayer + 1) % _players.Count;
+        }
     }
     
     private void AddPlayer()
@@ -62,17 +109,38 @@
     
     private void RemovePlayer(int index)
     {
-        _players.RemoveAt(index);
+        try
+        {
+            _players.RemoveAt(index);
+        }
+        catch (Exception _)
+        {
+            ToastService.Notify(new ToastMessage(ToastType.Danger, "Error: Need at least two players"));
+            throw;
+        }
     }
     
-    private void Restart()
+    private void Reset()
     {
         _players.Clear();
         _players.Add("");
         _players.Add("");
         _currentPlayer = 0;
-        _currentRoll = 0;
+        _currentRoll = null;
         _winner = null;
         _limits = (1, 100);
+    }
+
+    private bool VerifyPlayerNames()
+    {
+        if (AllPlayersHaveNames()) return true;
+        
+        ToastService.Notify(new ToastMessage(ToastType.Danger, "Error: All players need a name"));
+        return false;
+    }
+
+    private bool AllPlayersHaveNames()
+    {
+        return !_players.Any(string.IsNullOrWhiteSpace);
     }
 }
