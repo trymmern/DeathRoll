@@ -1,0 +1,78 @@
+﻿@page "/counter"
+@rendermode InteractiveServer
+
+<PageTitle>Death Roll</PageTitle>
+
+<h1>Death Roll</h1>
+
+@foreach(var (_, index) in _players.Select((player, index) => (player, index)))
+{
+    <input @bind="_players[index]" class="form-control player-name" placeholder="Player @(index+1) name"/>
+    <Button @onclick="() => RemovePlayer(index)" class="btn btn-danger">
+        <Icon Name="IconName.Trash"/>
+    </Button>
+    <br/>
+}
+<button class="btn btn-secondary" @onclick="AddPlayer">Add player</button>
+
+<p role="status">Current player @_players[_currentPlayer]</p>
+<p role="status">Current roll: @_currentRoll</p>
+@if (_winner != null)
+{
+    <p role="status">Winner: @_winner</p>
+}
+
+<button class="btn btn-primary" @onclick="Roll">Roll @_limits.min - @_limits.max</button>
+
+@code {
+    private (int min, int max) _limits = (1, 100);
+    private List<string?> _players = [];
+    private int _currentPlayer;
+    private int _currentRoll;
+    private string? _winner;
+
+    protected override void OnInitialized()
+    {
+        _players.Add("");
+        _players.Add("");
+    }
+        
+    private void Roll()
+    {
+        _currentRoll = new Random().Next(_limits.min, _limits.max);
+
+        if (_currentRoll == 1)
+        {
+            _players.RemoveAt(_currentPlayer);
+        }
+        
+        if (_players.Count == 1)
+        {
+            _winner = _players[0];
+        }
+        
+        _currentPlayer = (_currentPlayer + 1) % _players.Count;
+        _limits.max = _currentRoll;
+    }
+    
+    private void AddPlayer()
+    {
+        _players.Add("");
+    }
+    
+    private void RemovePlayer(int index)
+    {
+        _players.RemoveAt(index);
+    }
+    
+    private void Restart()
+    {
+        _players.Clear();
+        _players.Add("");
+        _players.Add("");
+        _currentPlayer = 0;
+        _currentRoll = 0;
+        _winner = null;
+        _limits = (1, 100);
+    }
+}
